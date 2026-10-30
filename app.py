@@ -124,9 +124,25 @@ obras, poblacion, colonias, comunidades, distritos = cargar_datos()
 # ============================================================
 
 
+# Obras
+
+obras["colonia_norm"] = (
+    obras["Colonia"]
+    .apply(normalizar_texto)
+)
+
+# Población
+
+poblacion["colonia_norm"] = (
+    poblacion["nombre2"]
+    .apply(normalizar_texto)
+)
+
 # ============================================================
 # 7. INCORPORAR POBLACIÓN POR COLONIA
 # ============================================================
+
+
 
 poblacion_cruce = poblacion[
     [

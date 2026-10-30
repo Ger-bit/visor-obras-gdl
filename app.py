@@ -11,9 +11,10 @@ Created on Wed Oct 28 11:27:57 2026
 # ============================================================
 import streamlit as st
 import pandas as pd
-import geopandas as gpd
 import folium
 import unicodedata
+import json
+
 from streamlit_folium import st_folium
 from folium.plugins import MarkerCluster
 
@@ -32,11 +33,11 @@ st.title("VISOR DE OBRAS PÚBLICAS GUADALAJARA 🏗️")
 # 3. RUTAS
 # ============================================================
 
-ruta_colonias_shp = "capas/ColoniasGDL.shp"
+ruta_colonias_geojson = "capas/colonias.geojson"
 
-ruta_comunidades_shp = "capas/comunidades_gdl_v5.gpkg"
+ruta_comunidades_geojson = "capas/comunidades.geojson"
 
-ruta_distritos_shp = "capas/DistritoLocalSept2022.shp"
+ruta_distritos_geojson = "capas/distritos.geojson"
 
 ruta_excel_obras = "input/obras_publicas_231026.xlsx"
 
@@ -79,17 +80,42 @@ def normalizar_texto(texto):
 @st.cache_data
 def cargar_datos():
 
-    obras = pd.read_excel(ruta_excel_obras)
+    obras = pd.read_excel(
+        ruta_excel_obras
+    )
 
-    poblacion = pd.read_csv(ruta_poblacion)
+    poblacion = pd.read_csv(
+        ruta_poblacion
+    )
 
-    colonias = gpd.read_file(ruta_colonias_shp)
+    with open(
+        ruta_colonias_geojson,
+        encoding="utf-8"
+    ) as f:
 
-    comunidades = gpd.read_file(ruta_comunidades_shp)
+        colonias = json.load(f)
 
-    distritos = gpd.read_file(ruta_distritos_shp)
+    with open(
+        ruta_comunidades_geojson,
+        encoding="utf-8"
+    ) as f:
 
-    return obras, poblacion, colonias, comunidades, distritos
+        comunidades = json.load(f)
+
+    with open(
+        ruta_distritos_geojson,
+        encoding="utf-8"
+    ) as f:
+
+        distritos = json.load(f)
+
+    return (
+        obras,
+        poblacion,
+        colonias,
+        comunidades,
+        distritos
+    )
 
 obras, poblacion, colonias, comunidades, distritos = cargar_datos()
 
@@ -97,20 +123,10 @@ obras, poblacion, colonias, comunidades, distritos = cargar_datos()
 # 6. NORMALIZACIÓN
 # ============================================================
 
-# Obras
-obras["colonia_norm"] = obras["Colonia"].apply(normalizar_texto)
-
-# Población
-poblacion["colonia_norm"] = poblacion["nombre2"].apply(normalizar_texto)
-
-# Colonias SHP
-colonias["colonia_norm"] = colonias["NOMBRE2"].apply(normalizar_texto)
 
 # ============================================================
 # 7. INCORPORAR POBLACIÓN POR COLONIA
 # ============================================================
-
-# Crear tabla de población limpia
 
 poblacion_cruce = poblacion[
     [
@@ -119,13 +135,9 @@ poblacion_cruce = poblacion[
     ]
 ].copy()
 
-# Eliminar duplicados
-
 poblacion_cruce = poblacion_cruce.drop_duplicates(
     subset=["colonia_norm"]
 )
-
-# Cruce directo Obras -> Población
 
 obras = obras.merge(
 
@@ -137,47 +149,20 @@ obras = obras.merge(
 
 )
 
-# Renombrar
-
 obras.rename(
 
     columns={
-        "POBTOT": "Poblacion_Colonia"
+        "POBTOT":"Poblacion_Colonia"
     },
 
     inplace=True
 
 )
 
-# Diagnóstico
-
-coincidencias = obras[
-    "Poblacion_Colonia"
-].notna().sum()
-
-print(
-    f"Coincidencias población: "
-    f"{coincidencias} de {len(obras)}"
-)
-
-#Prueba de cruces de población
-#st.write(
-#    obras[
-#        [
-#            "Colonia",
-#            "colonia_norm",
-#            "Poblacion_Colonia"
-#        ]
-#    ].head(30)
-#)
-
 # ============================================================
 # 8. FILTRAR DISTRITOS DE GDL
 # ============================================================
 
-distritos = distritos[
-    distritos["DISTRITO_L"].isin([8,9,11,13])
-]
 
 # ============================================================
 # 9. SIDEBAR
@@ -415,11 +400,6 @@ folium.TileLayer(
 # 15. CAPAS GEO
 # ============================================================
 
-colonias = colonias.to_crs(4326)
-
-comunidades = comunidades.to_crs(4326)
-
-distritos = distritos.to_crs(4326)
 
 
 folium.GeoJson(
